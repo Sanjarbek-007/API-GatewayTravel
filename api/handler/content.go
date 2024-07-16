@@ -25,7 +25,7 @@ var logger *zap.Logger
 // @Success 200 {object} string
 // @Failure 400 {object} string
 // @Failure 500 {object} string
-// @Router /api/content/createStory [post]
+// @Router /content/createStory [post]
 func (h *Handler) CreateStory(ctx *gin.Context) {
 	request := pb.CrateStoryRequest{}
 	if err := ctx.ShouldBindJSON(&request); err != nil {
@@ -49,14 +49,14 @@ func (h *Handler) CreateStory(ctx *gin.Context) {
 	_, err = h.ContentService.CrateStory(ctx, &request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message":"errorncreating story in handler",
+			"message": "errorncreating story in handler",
 		})
 		h.Log.Error("error")
 		return
 	}
 
 	ctx.JSON(http.StatusCreated, gin.H{
-		"message":"Story Created",
+		"message": "Story Created",
 	})
 }
 
@@ -72,11 +72,10 @@ func (h *Handler) CreateStory(ctx *gin.Context) {
 // @Success 200 {object} string
 // @Failure 400 {object} string
 // @Failure 500 {object} string
-// @Router /api/menu/update/{id} [put]
+// @Router /content/updateStory/{id} [put]
 func (h *Handler) UpdateStory(ctx *gin.Context) {
 	request := pb.UpdateStoryRequest{}
 
-	err := ctx.ShouldBindJSON(&request)
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
 		logger.Error("error in CreateStory")
@@ -84,207 +83,91 @@ func (h *Handler) UpdateStory(ctx *gin.Context) {
 	}
 	request.StoryId = ctx.Param("id")
 
-	_, err = uuid.Parse(request.StoryId)
+	_, err := uuid.Parse(request.StoryId)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong id"))
 		h.Log.Error("error")
 		return
 	}
 
-	if request.Name == "" || request.Description == "" {
-		BadRequest(ctx, fmt.Errorf("malumot toliq emas"))
+	if request.Title == "" || request.Content == "" {
+		ctx.JSON(http.StatusBadRequest, fmt.Errorf("it is not full information"))
 		h.Log.Error("error")
 		return
 	}
-	_, err = h.ReservationService.GetByIdRestaurant(ctx, &pb.IdRequest{Id: request.RestaurantId})
+	_, err = h.ContentService.UpdateStory(ctx, &request)
 	if err != nil {
-		h.Log.Error("error")
-		BadRequest(ctx, fmt.Errorf("restaurant id yoq %v", err))
-		return
-	}
-	_, err = h.ReservationService.GetByIdMenu(ctx, &pb.IdRequest{Id: request.RestaurantId})
-	if err != nil {
-		BadRequest(ctx, fmt.Errorf("menu id yoq"))
-		return
-	}
-	_, err = h.ReservationService.GetByIdMenu(ctx, &pb.IdRequest{Id: request.Id})
-	if err != nil {
-		BadRequest(ctx, fmt.Errorf("error is ->bu id yoq database da yoq"))
-		return
-	}
-	_, err = h.ReservationService.UpdateMenu(ctx, &request)
-
-	if err != nil {
-		fmt.Println("++++++++++++++")
-
-		InternalServerError(ctx, err)
+		ctx.JSON(http.StatusBadRequest, fmt.Errorf("error in Gateway UpdateStory"))
 		h.Log.Error("error")
 		return
 	}
 
-	OK(ctx)
+	ctx.JSON(http.StatusCreated, gin.H{
+		"message": "Story Updated",
+	})
 }
 
-// DeleteMenuHandler handles the deletion of a menu item.
-// @Summary Delete Menu
-// @Description Delete an existing menu item
-// @Tags Menu
+// DeleteStoryHandler handles the deletion of a story.
+// @Summary Delete Story
+// @Description Delete an existing story
+// @Tags Story
 // @Accept json
 // @Security BearerAuth
 // @Produce json
-// @Param id path string true "Menu ID"
+// @Param id path string true "story ID"
 // @Success 200 {object} string
 // @Failure 400 {object} string
 // @Failure 500 {object} string
-// @Router /api/menu/delete/{id} [delete]
-func (h *Handler) DeleteMenuHandler(ctx *gin.Context) {
+// @Router /content/deleteStory/{id} [delete]
+func (h *Handler) DeleteStory(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	if Parse(id) {
+	_, err := uuid.Parse(id)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong id"))
 		h.Log.Error("error")
 		return
 	}
-	_, err := h.ReservationService.GetByIdMenu(ctx, &pb.IdRequest{Id: id})
-	if err != nil {
 
-		h.Log.Error("error")
+	_, err = h.ContentService.DeleteStory(ctx, &pb.DeleteStoryRequest{StoryId: id})
 
-		BadRequest(ctx, fmt.Errorf("error is  ->bu id yoq database da yoq"))
-		return
-	}
-	_, err = h.ReservationService.GetByIdMenu(ctx, &pb.IdRequest{})
 	if err != nil {
-		BadRequest(ctx, fmt.Errorf("menu id yoq"))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Error in Gateway DeleteStory"})
+		logger.Error("error")
 		return
 	}
 
-	_, err = h.ReservationService.DeleteMenu(ctx, &pb.IdRequest{Id: id})
-
-	if err != nil {
-		fmt.Println("++++++++++++", err)
-		InternalServerError(ctx, err)
-		h.Log.Error("error")
-		return
-	}
-	h.Log.Info("ishladi")
-	OK(ctx)
+	ctx.JSON(http.StatusCreated, gin.H{
+		"message": "Story Deleted",
+	})
 }
 
-// GetByIdMenuHandler handles the request to fetch a menu item by its ID.
-// @Summary Get Menu by ID
-// @Description Get a menu item by its ID
-// @Tags Menu
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param id path string true "Menu ID"
-// @Success 200 {object} genproto.MenuResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /api/menu/get_id/{id} [get]
-func (h *Handler) GetByIdMenuHandler(ctx *gin.Context) {
-	id := ctx.Param("id")
-
-	if Parse(id) {
-		h.Log.Error("error")
-		return
-	}
-
-	resp, err := h.ReservationService.GetByIdMenu(ctx, &pb.IdRequest{Id: id})
-
-	if err != nil {
-		h.Log.Error("error")
-		InternalServerError(ctx, fmt.Errorf(""))
-		return
-	}
-	h.Log.Info("ishladi")
-	ctx.JSON(http.StatusOK, resp)
-}
-
-// GetAllMenuHandler retrieves a list of menu items with optional filtering and pagination.
-// @Summary Get All Menu
-// @Description Retrieve a list of menu items with optional filtering and pagination.
-// @Tags Menu
+// GetAllStoriesHandler retrieves a list of stories with optional filtering and pagination.
+// @Summary Get All Stories
+// @Description Retrieve a list of Stories with optional filtering and pagination.
+// @Tags Story
 // @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param name query string false "Filter by menu item name"
-// @Param description query string false "Filter by menu item description"
-// @Param restaurant_id query string false "Filter by restaurant ID"
+// @Param story_id query string false "Filter by story_id"
 // @Param limit query int false "Number of items to return"
 // @Param offset query int false "Offset for pagination"
-// @Param price query string false "Filter by menu item price"
 // @Success 200 {object} genproto.MenusResponse
 // @Failure 400 {object} string
 // @Failure 500 {object} string
-// @Router /api/menu/get_all [get]
-func (h *Handler) GetAllMenuHandler(ctx *gin.Context) {
-	h.Log.Info("dsndjfjef")
-	request := pb.GetAllMenuRequest{
-		Name:         ctx.Query("name"),
-		Description:  ctx.Query("description"),
-		RestaurantId: ctx.Query("restaurant_id"),
-		LimitOffset:  &pb.Filter{}, // Ensure LimitOffset is initialized
+// @Router /content/get_all [get]
+func (h *Handler) GetAllStories(ctx *gin.Context) {
+	limit, _ := strconv.Atoi(ctx.Query("limit"))
+	offset, _ := strconv.Atoi(ctx.Query("offset"))
+	request := pb.GetAllStoriesRequest{
+		AuthorId: ctx.Query("name"),
+		Limit:    int32(limit),
+		Offset:   int32(offset),
 	}
 
-	limit := ctx.Query("limit")
-	limit1, err := IsLimitOffsetValidate(limit)
+	resp, err := h.ContentService.GetAllStories(ctx, &request)
 	if err != nil {
-		BadRequest(ctx, err)
-		h.Log.Error("error")
-		return
-	}
-
-	if len(request.RestaurantId) > 0 {
-		if Parse(request.RestaurantId) {
-			BadRequest(ctx, fmt.Errorf("id hato"))
-			h.Log.Error("error")
-			return
-		}
-	}
-
-	offset := ctx.Query("offset")
-	offset1, err := IsLimitOffsetValidate(offset)
-	if err != nil {
-		h.Log.Error("error")
-		BadRequest(ctx, err)
-		return
-	}
-
-	price := ctx.Query("price")
-	var price1 int
-	if price != "" {
-		price1, err = strconv.Atoi(price)
-		if err != nil {
-			h.Log.Error("error")
-			BadRequest(ctx, err)
-			return
-		}
-	}
-
-	request.LimitOffset.Limit = int64(limit1)
-	request.LimitOffset.Offset = int64(offset1)
-	request.Price = float32(price1)
-
-	if len(request.RestaurantId) != 0 {
-		if Parse(request.RestaurantId) {
-			BadRequest(ctx, fmt.Errorf("id hato"))
-			h.Log.Error("error")
-			return
-		} else {
-			_, err = h.ReservationService.GetByIdRestaurant(ctx, &pb.IdRequest{Id: request.RestaurantId})
-			if err != nil {
-				h.Log.Error("error")
-				BadRequest(ctx, fmt.Errorf("restaurant id yoq"))
-				return
-			}
-		}
-	}
-
-	resp, err := h.ReservationService.GetAllMenu(ctx, &request)
-	if err != nil {
-		fmt.Println("+++++++++", err)
-		InternalServerError(ctx, err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway GetAllStories"})
 		h.Log.Error("error")
 		return
 	}
