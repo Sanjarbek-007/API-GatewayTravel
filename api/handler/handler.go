@@ -8,14 +8,14 @@ import (
 
 type Handler struct {
 	ContentService     genproto.ContentServiceClient
-	// UsersService       genproto.UserServiceClient
+	UsersService       genproto.UserServiceClient
 	Log                *zap.Logger
 }
 
 func NewHandler(content genproto.ContentServiceClient, user genproto.UserServiceClient, l *zap.Logger) *Handler {
 	return &Handler{
 		ContentService:     content,
-		// UsersService:       user,
+		UsersService:       user,
 		Log: l,
 		
 	}
