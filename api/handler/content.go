@@ -1,807 +1,833 @@
-package handlers
+package handler
 
 import (
-	pb "API-Gateway/genproto"
+	"API-Gateway/api/auth"
+	pb "API-Gateway/genproto/content"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
-
-// CreateStory handles the creation of a new Story.
-// @Summary Create Story
-// @Description Create a new Story
-// @Tags Story
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param Create body genproto.CrateStoryRequest true "Create Story"
-// @
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/createStory [post]
-func (h *Handler) CreateStory(ctx *gin.Context) {
-	request := pb.CrateStoryRequest{}
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
-		h.Log.Error("error in CreateStory")
-		return
+// CreateStory godoc
+// @Security ApiKeyAuth
+// @Summary create story
+// @Description create new story
+// @Tags stories
+// @Param info body content.CreateStoriesRequest true "info"
+// @Success 200 {object} content.CreateStoriesResponse
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/stories [post]
+func (h *Handler) CreateStory(c *gin.Context) {
+	h.Log.Info("CreateStory started")
+	req := pb.CreateStoriesRequest{}
+	if err := c.BindJSON(&req); err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
-
-	if request.Location == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": "it is not full information"})
-		return
-	}
-
-	_, err := uuid.Parse(request.AuthorId)
+	accessToken := c.GetHeader("Authorization")
+	id, err := auth.GetUserIdFromAccessToken(accessToken)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
-
-	_, err = h.ContentService.CrateStory(ctx, &request)
+	req.UserId = id
+	res, err := h.ContentService.CreateStories(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "errorncreating story in handler",
-		})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Story Created",
-	})
+	c.JSON(200, &res)
+	h.Log.Info("CreateStory ended")
 }
 
-// UpdateStory handles the update of a story.
-// @Summary Update Story
-// @Description Update an existing story
-// @Tags Story
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param id path string true "Story ID"
-// @Param Update body genproto.UpdateStoryRequest true "Update Story"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/updateStory/{id} [put]
-func (h *Handler) UpdateStory(ctx *gin.Context) {
-	request := pb.UpdateStoryRequest{}
-
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
-		h.Log.Error("error in CreateStory")
-		return
+// UpdateStory godoc
+// @Security ApiKeyAuth
+// @Summary Update story
+// @Description Update new story
+// @Tags stories
+// @Param story_id path string true "story_id"
+// @Param info body content.UpdateStoriesReq true "info"
+// @Success 200 {object} content.UpdateStoriesRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/stories/{story_id} [put]
+func (h *Handler) UpdateStory(c *gin.Context) {
+	h.Log.Info("UpdateStory started")
+	req := pb.UpdateStoriesReq{}
+	if err := c.BindJSON(&req); err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
-	request.StoryId = ctx.Param("id")
-
-	_, err := uuid.Parse(request.StoryId)
+	req.Id = c.Param("story_id")
+	res, err := h.ContentService.UpdateStories(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	if request.Title == "" || request.Content == "" {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("it is not full information"))
-		h.Log.Error("error")
-		return
-	}
-	_, err = h.ContentService.UpdateStory(ctx, &request)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("error in Gateway UpdateStory"))
-		h.Log.Error("error")
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Story Updated",
-	})
+	c.JSON(200, &res)
+	h.Log.Info("UpdateStory ended")
 }
 
-// DeleteStoryHandler handles the deletion of a story.
-// @Summary Delete Story
-// @Description Delete an existing story
-// @Tags Story
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param id path string true "story ID"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/deleteStory/{id} [delete]
-func (h *Handler) DeleteStory(ctx *gin.Context) {
-	id := ctx.Param("id")
-
-	_, err := uuid.Parse(id)
+// DeleteStory godoc
+// @Security ApiKeyAuth
+// @Summary Delete story
+// @Description Delete new story
+// @Tags stories
+// @Param story_id path string true "story_id"
+// @Success 200 {object} string "succesfully deleted"
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/stories/{story_id} [delete]
+func (h *Handler) DeleteStory(c *gin.Context) {
+	h.Log.Info("DeleteStory started")
+	req := pb.StoryId{}
+	req.Id = c.Param("story_id")
+	_, err := h.ContentService.DeleteStories(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	_, err = h.ContentService.DeleteStory(ctx, &pb.DeleteStoryRequest{StoryId: id})
-
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Error in Gateway DeleteStory"})
-		h.Log.Error("error")
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Story Deleted",
-	})
+	c.JSON(200, gin.H{"message": "succesfully deleted"})
+	h.Log.Info("DeleteStory ended")
 }
 
-// GetAllStoriesHandler retrieves a list of stories with optional filtering and pagination.
-// @Summary Get All Stories
-// @Description Retrieve a list of Stories with optional filtering and pagination.
-// @Tags Story
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param story_id query string false "Filter by story_id"
-// @Param limit query int false "Number of items to return"
-// @Param offset query int false "Offset for pagination"
-// @Success 200 {object} genproto.MenusResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/getAllStories [get]
-func (h *Handler) GetAllStories(ctx *gin.Context) {
-	limit, _ := strconv.Atoi(ctx.Query("limit"))
-	offset, _ := strconv.Atoi(ctx.Query("offset"))
-	request := pb.GetAllStoriesRequest{
-		AuthorId: ctx.Query("name"),
-		Limit:    int32(limit),
-		Offset:   int32(offset),
+// GetAllStories godoc
+// @Security ApiKeyAuth
+// @Summary get all story
+// @Description get all stories
+// @Tags stories
+// @Param limit query string false "Number of stories to fetch"
+// @Param offset query string false "Number of stories to omit"
+// @Success 200 {object} content.GetAllStoriesRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/stories [get]
+func (h *Handler) GetAllStories(c *gin.Context) {
+	h.Log.Info("GetAllStories started")
+	req := pb.GetAllStoriesReq{}
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Limit = int64(limit)
+	} else {
+		req.Limit = 10
 	}
 
-	resp, err := h.ContentService.GetAllStories(ctx, &request)
+	if offsetStr != "" {
+		offset, err := strconv.Atoi(offsetStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Offset = int64(offset)
+	} else {
+		req.Offset = 0
+	}
+
+	res, err := h.ContentService.GetAllStories(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway GetAllStories"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusOK, resp)
+	c.JSON(200, &res)
+	h.Log.Info("GetAllStories ended")
 }
 
-// StoryFullInfoHandler retrieves full information about a specific story.
-// @Summary Get Story Full Info
-// @Description Retrieve full information about a specific story.
-// @Tags Story
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param story_id path string true "Story ID"
-// @Success 200 {object} genproto.StoryFullInfoResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/storyFullInfo/{story_id} [get]
-func (h *Handler) StoryFullInfo(ctx *gin.Context) {
-	storyID := ctx.Param("story_id")
+// GetStory godoc
+// @Security ApiKeyAuth
+// @Summary Get story
+// @Description Get story by id
+// @Tags stories
+// @Param story_id path string true "story_id"
+// @Success 200 {object} content.GetStoryRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/stories/{story_id} [get]
+func (h *Handler) GetStory(c *gin.Context) {
+	h.Log.Info("GetStory started")
+	req := pb.StoryId{}
+	req.Id = c.Param("story_id")
+	if len(req.Id) <= 0 {
 
-	_, err := uuid.Parse(storyID)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong story_id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
+
 	}
-
-	resp, err := h.ContentService.StoryFullInfo(ctx, &pb.StoryFullInfoRequest{StoryId: storyID})
+	res, err := h.ContentService.GetStory(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway StoryFullInfo"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusOK, resp)
+	c.JSON(200, &res)
+	h.Log.Info("GetStory ended")
 }
 
-// CommentStoryHandler handles commenting on a story.
-// @Summary Comment on Story
-// @Description Comment on a specific story.
-// @Tags Story
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param story_id path string true "Story ID"
-// @Param Create body genproto.CommentStoryRequest true "Comment on Story"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/commentStory/{story_id} [post]
-func (h *Handler) CommentStory(ctx *gin.Context) {
-	storyID := ctx.Param("story_id")
-
-	_, err := uuid.Parse(storyID)
+// CommentStory godoc
+// @Security ApiKeyAuth
+// @Summary comment story
+// @Description comment to story
+// @Tags stories
+// @Param story_id path string true "story_id"
+// @Param info body content.CommentStoryReq true "story_id"
+// @Success 200 {object} content.CommentStoryRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/stories/{story_id}/comments [post]
+func (h *Handler) CommentStory(c *gin.Context) {
+	h.Log.Info("CommentStory started")
+	accessToken := c.GetHeader("Authorization")
+	id, err := auth.GetUserIdFromAccessToken(accessToken)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong story_id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
 	}
-
-	request := pb.CommentStoryRequest{}
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
-		h.Log.Error("error")
-		return
-	}
-	request.StoryId = storyID
-
-	_, err = h.ContentService.CommentStory(ctx, &request)
+	req := pb.CommentStoryReq{}
+	c.BindJSON(&req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway CommentStory"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
 	}
+	req.AuthorId = id
+	req.StoryId = c.Param("story_id")
+	if len(req.StoryId) <= 0 {
 
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Comment added to Story",
-	})
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
+
+	}
+	res, err := h.ContentService.CommentStory(c, &req)
+	if err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
+	}
+	c.JSON(200, &res)
+	h.Log.Info("CommentStory ended")
 }
 
-// GetAllCommentsHandler retrieves all comments for a specific story.
-// @Summary Get All Comments
-// @Description Retrieve all comments for a specific story.
-// @Tags Story
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param story_id path string true "Story ID"
-// @Param limit query int false "Number of items to return"
-// @Param offset query int false "Offset for pagination"
-// @Success 200 {object} genproto.GetAllCommentResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/getAllComments/{story_id} [get]
-func (h *Handler) getGetAllComments(ctx *gin.Context) {
-	storyID := ctx.Param("story_id")
+// GetCommentsOfStory godoc
+// @Security ApiKeyAuth
+// @Summary comment of story
+// @Description get comment of story
+// @Tags stories
+// @Param story_id path string true "story_id"
+// @Param limit query string false "Number of stories to fetch"
+// @Param offset query string false "Number of stories to omit"
+// @Success 200 {object} content.GetCommentsOfStoryRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/stories/{story_id}/comments [get]
+func (h *Handler) GetCommentsOfStory(c *gin.Context) {
+	h.Log.Info("GetCommentsOfStory started")
+	req := pb.GetCommentsOfStoryReq{}
+	req.StoryId = c.Param("story_id")
+	if len(req.StoryId) <= 0 {
 
-	_, err := uuid.Parse(storyID)
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
+
+	}
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Limit = int64(limit)
+	} else {
+		req.Limit = 10
+	}
+
+	if offsetStr != "" {
+		offset, err := strconv.Atoi(offsetStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Offset = int64(offset)
+	} else {
+		req.Offset = 0
+	}
+
+	res, err := h.ContentService.GetCommentsOfStory(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong story_id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	limit, _ := strconv.Atoi(ctx.Query("limit"))
-	offset, _ := strconv.Atoi(ctx.Query("offset"))
-	request := pb.GetAllCommentRequest{
-		StoryId: storyID,
-		Limit:   int32(limit),
-		Offset:  int32(offset),
-	}
-
-	resp, err := h.ContentService.GetAllComments(ctx, &request)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway GetAllComments"})
-		h.Log.Error("error")
-		return
-	}
-
-	ctx.JSON(http.StatusOK, resp)
+	c.JSON(200, &res)
+	h.Log.Info("GetCommentsOfStory ended")
 }
 
-
-// CreateLikeHandler handles creating a like for a story.
-// @Summary Create Like
-// @Description Create a like for a specific story.
-// @Tags Story
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param story_id path string true "Story ID"
-// @Param Create body genproto.CreateLikeRequest true "Create Like"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/createLike/{story_id} [post]
-func (h *Handler) CreateLike(ctx *gin.Context) {
-	storyID := ctx.Param("story_id")
-
-	_, err := uuid.Parse(storyID)
+// Like godoc
+// @Security ApiKeyAuth
+// @Summary comment story
+// @Description comment to story
+// @Tags stories
+// @Param story_id path string true "story_id"
+// @Success 200 {object} content.LikeRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/stories/{story_id}/like [post]
+func (h *Handler) Like(c *gin.Context) {
+	h.Log.Info("Like started")
+	accessToken := c.GetHeader("Authorization")
+	id, err := auth.GetUserIdFromAccessToken(accessToken)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong story_id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
 	}
-
-	request := pb.CreateLikeRequest{}
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
-		h.Log.Error("error")
-		return
+	req := pb.LikeReq{}
+	req.UserId = id
+	req.StoryId = c.Param("story_id")
+	if len(req.StoryId) <= 0 {
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
 	}
-	request.StoryId = storyID
-
-	_, err = h.ContentService.CreateLike(ctx, &request)
+	res, err := h.ContentService.Like(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway CreateLike"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Like added to Story",
-	})
+	c.JSON(200, &res)
+	h.Log.Info("Like ended")
 }
 
-// CreateItinerariesHandler handles creating an itinerary.
-// @Summary Create Itinerary
-// @Description Create a new itinerary.
-// @Tags Itinerary
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param Create body genproto.CreateItinerariesRequest true "Create Itinerary"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/createItineraries [post]
-func (h *Handler) CreateItineraries(ctx *gin.Context) {
-	request := pb.CreateItinerariesRequest{}
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
-		h.Log.Error("error")
-		return
-	}
-
-	if request.Title == "" || request.Description == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": "it is not full information"})
-		return
-	}
-
-	_, err := h.ContentService.CreateItineraries(ctx, &request)
+// Itineraries godoc
+// @Security ApiKeyAuth
+// @Summary create
+// @Description create itineraries
+// @Tags itineraries
+// @Param info body content.ItinerariesReq true "info"
+// @Success 200 {object} content.ItinerariesRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/itineraries [post]
+func (h *Handler) Itineraries(c *gin.Context) {
+	h.Log.Info("Itineraries started")
+	accessToken := c.GetHeader("Authorization")
+	id, err := auth.GetUserIdFromAccessToken(accessToken)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error creating itinerary in handler"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Itinerary Created",
-	})
+	req := pb.ItinerariesReq{}
+	err = c.BindJSON(&req)
+	if err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
+	}
+	req.UserId = id
+	res, err := h.ContentService.Itineraries(c, &req)
+	if err != nil {
+		h.Log.Error("there")
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
+	}
+	c.JSON(200, &res)
+	h.Log.Info("Itineraries ended")
 }
 
-// UpdateItinerariesHandler handles updating an itinerary.
-// @Summary Update Itinerary
-// @Description Update an existing itinerary.
-// @Tags Itinerary
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param id path string true "Itinerary ID"
-// @Param Update body genproto.UpdateItinerariesRequest true "Update Itinerary"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/updateItineraries/{id} [put]
-func (h *Handler) UpdateItineraries(ctx *gin.Context) {
-	request := pb.UpdateItinerariesRequest{}
-
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
-		h.Log.Error("error")
-		return
-	}
-	request.ItineraryId = ctx.Param("id")
-
-	_, err := uuid.Parse(request.ItineraryId)
+// UpdateItineraries godoc
+// @Security ApiKeyAuth
+// @Summary update
+// @Description update itineraries
+// @Tags itineraries
+// @Param itinerary_id path string true "itinerary_id"
+// @Param info body content.UpdateItinerariesReq true "info"
+// @Success 200 {object} content.ItinerariesRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/itineraries/{itinerary_id} [put]
+func (h *Handler) UpdateItineraries(c *gin.Context) {
+	h.Log.Info("UpdateItineraries started")
+	req := pb.UpdateItinerariesReq{}
+	err := c.BindJSON(&req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
 	}
+	req.Id = c.Param("itinerary_id")
+	if len(req.Id) <= 0 {
 
-	if request.Title == "" || request.Description == "" {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("it is not full information"))
-		h.Log.Error("error")
-		return
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
+
 	}
-
-	_, err = h.ContentService.UpdateItineraries(ctx, &request)
+	res, err := h.ContentService.UpdateItineraries(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("error in Gateway UpdateItineraries"))
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Itinerary Updated",
-	})
+	c.JSON(200, &res)
+	h.Log.Info("UpdateItineraries ended")
 }
 
-// DeleteItinerariesHandler handles deleting an itinerary.
-// @Summary Delete Itinerary
-// @Description Delete an existing itinerary.
-// @Tags Itinerary
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param id path string true "Itinerary ID"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/deleteItineraries/{id} [delete]
-func (h *Handler) DeleteItineraries(ctx *gin.Context) {
-	id := ctx.Param("id")
+// DeleteItineraries godoc
+// @Security ApiKeyAuth
+// @Summary Delete
+// @Description Delete itineraries
+// @Tags itineraries
+// @Param itinerary_id path string true "itinerary_id"
+// @Success 200 {object} string "successfully deleted"
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/itineraries/{itinerary_id} [delete]
+func (h *Handler) DeleteItineraries(c *gin.Context) {
+	h.Log.Info("DeleteItineraries started")
+	req := pb.StoryId{}
+	req.Id = c.Param("itinerary_id")
+	if len(req.Id) <= 0 {
 
-	_, err := uuid.Parse(id)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
+
 	}
-
-	_, err = h.ContentService.DeleteItineraries(ctx, &pb.DeleteItinerariesRequest{ItineraryId: id})
-
+	_, err := h.ContentService.DeleteItineraries(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Error in Gateway DeleteItineraries"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Itinerary Deleted",
-	})
+	c.JSON(200, gin.H{"message": "successfully deleted"})
+	h.Log.Info("DeleteItineraries ended")
 }
 
-// GetAllItinerariesHandler retrieves all itineraries with optional filtering and pagination.
-// @Summary Get All Itineraries
-// @Description Retrieve all itineraries with optional filtering and pagination.
-// @Tags Itinerary
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param itinerary_id query string false "Filter by itinerary_id"
-// @Param limit query int false "Number of items to return"
-// @Param offset query int false "Offset for pagination"
-// @Success 200 {object} genproto.GetAllItinerariesResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/getAllItineraries [get]
-func (h *Handler) GetAllItineraries(ctx *gin.Context) {
-	limit, _ := strconv.Atoi(ctx.Query("limit"))
-	offset, _ := strconv.Atoi(ctx.Query("offset"))
-	request := pb.GetAllItinerariesRequest{
-		ItineraryId: ctx.Query("name"),
-		Limit:       int32(limit),
-		Offset:      int32(offset),
+// GetItineraries godoc
+// @Security ApiKeyAuth
+// @Summary Get
+// @Description Get itineraries
+// @Tags itineraries
+// @Param limit query string false "Number of itineraries to fetch"
+// @Param offset query string false "Number of itineraries to omit"
+// @Success 200 {object} content.GetItinerariesRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/itineraries [get]
+func (h *Handler) GetItineraries(c *gin.Context) {
+	h.Log.Info("GetItineraries started")
+	req := pb.GetItinerariesReq{}
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Limit = int64(limit)
+	} else {
+		req.Limit = 10
 	}
 
-	resp, err := h.ContentService.GetAllItineraries(ctx, &request)
+	if offsetStr != "" {
+		offset, err := strconv.Atoi(offsetStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Offset = int64(offset)
+	} else {
+		req.Offset = 0
+	}
+
+	res, err := h.ContentService.GetItineraries(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway GetAllItineraries"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusOK, resp)
+	c.JSON(200, &res)
+	h.Log.Info("GetItineraries ended")
 }
 
-// ItinerariesFullInfoHandler retrieves full information about a specific itinerary.
-// @Summary Get Itinerary Full Info
-// @Description Retrieve full information about a specific itinerary.
-// @Tags Itinerary
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param itinerary_id path string true "Itinerary ID"
-// @Success 200 {object} genproto.ItinerariesFullInfoResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/itinerariesFullInfo/{itinerary_id} [get]
-func (h *Handler) ItinerariesFullInfo(ctx *gin.Context) {
-	itineraryID := ctx.Param("itinerary_id")
-
-	_, err := uuid.Parse(itineraryID)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong itinerary_id"))
-		h.Log.Error("error")
-		return
+// GetItinerariesById godoc
+// @Security ApiKeyAuth
+// @Summary Get
+// @Description Get itineraries by id
+// @Tags itineraries
+// @Param itinerary_id path string true "itinerary_id"
+// @Success 200 {object} content.GetItinerariesByIdRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/itineraries/{itinerary_id} [get]
+func (h *Handler) GetItinerariesById(c *gin.Context) {
+	h.Log.Info("GetItinerariesById started")
+	req := pb.StoryId{}
+	req.Id = c.Param("itinerary_id")
+	if len(req.Id) <= 0 {
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
 	}
-
-	resp, err := h.ContentService.ItinerariesFullInfo(ctx, &pb.ItinerariesFullInfoRequest{ItineraryId: itineraryID})
+	res, err := h.ContentService.GetItinerariesById(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway ItinerariesFullInfo"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusOK, resp)
+	c.JSON(200, &res)
+	h.Log.Info("GetItinerariesById ended")
 }
 
-// CommentItinerariesHandler handles commenting on an itinerary.
-// @Summary Comment on Itinerary
-// @Description Comment on a specific itinerary.
-// @Tags Itinerary
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param itinerary_id path string true "Itinerary ID"
-// @Param Create body genproto.CommentItinerariesRequest true "Comment on Itinerary"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/commentItineraries/{itinerary_id} [post]
-func (h *Handler) CommentItineraries(ctx *gin.Context) {
-	itineraryID := ctx.Param("itinerary_id")
-
-	_, err := uuid.Parse(itineraryID)
+// CommentItineraries godoc
+// @Security ApiKeyAuth
+// @Summary comment
+// @Description comment itineraries
+// @Tags itineraries
+// @Param itinerary_id path string true "itinerary_id"
+// @Param info body content.CommentItinerariesReq true "info"
+// @Success 200 {object} content.CommentItinerariesRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/itineraries/{itinerary_id}/comments [post]
+func (h *Handler) CommentItineraries(c *gin.Context) {
+	h.Log.Info("CommentItineraries started")
+	accessToken := c.GetHeader("Authorization")
+	id, err := auth.GetUserIdFromAccessToken(accessToken)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong itinerary_id"))
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
 	}
-
-	request := pb.CommentItinerariesRequest{}
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
-		h.Log.Error("error")
-		return
-	}
-	request.ItineraryId = itineraryID
-
-	_, err = h.ContentService.CommentItineraries(ctx, &request)
+	req := pb.CommentItinerariesReq{}
+	err = c.BindJSON(&req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway CommentItineraries"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Comment added to Itinerary",
-	})
+	req.ItineraryId = c.Param("itinerary_id")
+	if len(req.ItineraryId) <= 0 {
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
+	}
+	req.AuthorId = id
+	res, err := h.ContentService.CommentItineraries(c, &req)
+	if err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
+	}
+	c.JSON(200, &res)
+	h.Log.Info("CommentItineraries ended")
 }
 
-// GetDestinationsHandler retrieves all destinations.
-// @Summary Get All Destinations
-// @Description Retrieve all destinations.
-// @Tags Destination
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Success 200 {object} genproto.GetDestinationsResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/getDestinations [get]
-func (h *Handler) GetDestinations(ctx *gin.Context) {
-	resp, err := h.ContentService.GetDestinations(ctx, &pb.GetDestinationsRequest{})
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway GetDestinations"})
-		h.Log.Error("error")
-		return
+// GetDestinations godoc
+// @Security ApiKeyAuth
+// @Summary get
+// @Description get destination
+// @Tags destinations
+// @Param limit query string false "limit"
+// @Param offset query string false "offset"
+// @Param name query string false "name"
+// @Success 200 {object} content.GetDestinationsRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/destinations [get]
+func (h *Handler) GetDestinations(c *gin.Context) {
+	h.Log.Info("GetDestinations started")
+	req := pb.GetDestinationsReq{}
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+	req.Name = c.Query("name")
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Limit = int64(limit)
+	} else {
+		req.Limit = 10
 	}
 
-	ctx.JSON(http.StatusOK, resp)
+	if offsetStr != "" {
+		offset, err := strconv.Atoi(offsetStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Offset = int64(offset)
+	} else {
+		req.Offset = 0
+	}
+
+	res, err := h.ContentService.GetDestinations(c, &req)
+	if err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
+	}
+	c.JSON(200, &res)
+	h.Log.Info("GetDestinations ended")
 }
 
-// GetDestinationInfoHandler retrieves information about a specific destination.
-// @Summary Get Destination Info
-// @Description Retrieve information about a specific destination.
-// @Tags Destination
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param destination_id path string true "Destination ID"
-// @Success 200 {object} genproto.GetDestinationInfoResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/getDestinationInfo/{destination_id} [get]
-func (h *Handler) GetDestinationInfo(ctx *gin.Context) {
-	destinationID := ctx.Param("destination_id")
-
-	_, err := uuid.Parse(destinationID)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong destination_id"))
-		h.Log.Error("error")
-		return
+// GetDestinationsById godoc
+// @Security ApiKeyAuth
+// @Summary Get
+// @Description Get destination by id
+// @Tags destinations
+// @Param destination_id path string true "destination_id"
+// @Success 200 {object} content.GetDestinationsByIdRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/destinations/{destination_id} [get]
+func (h *Handler) GetDestinationsById(c *gin.Context) {
+	h.Log.Info("GetDestinationsById started")
+	req := pb.GetDestinationsByIdReq{}
+	req.Id = c.Param("destination_id")
+	if len(req.Id) <= 0 {
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
 	}
-
-	resp, err := h.ContentService.GetDestinationInfo(ctx, &pb.GetDestinationInfoRequest{DestinationId: destinationID})
+	res, err := h.ContentService.GetDestinationsById(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway GetDestinationInfo"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusOK, resp)
+	c.JSON(200, &res)
+	h.Log.Info("GetDestinationsById ended")
 }
 
-// SentMessageHandler handles sending a message.
+// SendMessage godoc
+// @Security ApiKeyAuth
 // @Summary Send Message
-// @Description Send a message.
-// @Tags Message
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param Create body genproto.SentMessageRequest true "Send Message"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/sentMessage [post]
-func (h *Handler) SentMessage(ctx *gin.Context) {
-	request := pb.SentMessageRequest{}
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
-		h.Log.Error("error")
-		return
-	}
-
-	if request.Content == "" || request.RecipientId == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": "it is not full information"})
-		return
-	}
-
-	_, err := h.ContentService.SentMessage(ctx, &request)
+// @Description Send Message
+// @Tags message
+// @Param info body content.SendMessageReq true "info"
+// @Success 200 {object} content.SendMessageRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/messages [post]
+func (h *Handler) SendMessage(c *gin.Context) {
+	h.Log.Info("SendMessage started")
+	accessToken := c.GetHeader("Authorization")
+	id, err := auth.GetUserIdFromAccessToken(accessToken)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error sending message in handler"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	}
+	req := pb.SendMessageReq{}
+	err = c.BindJSON(&req)
+	if err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	}
+	req.UserId = id
+	res, err := h.ContentService.SendMessage(c, &req)
+	if err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Message Sent",
-	})
+	c.JSON(200, &res)
+	h.Log.Info("SendMessage ended")
 }
 
-// GetAllMessagesHandler retrieves all messages with optional filtering and pagination.
-// @Summary Get All Messages
-// @Description Retrieve all messages with optional filtering and pagination.
-// @Tags Message
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param limit query int false "Number of items to return"
-// @Param offset query int false "Offset for pagination"
-// @Success 200 {object} genproto.GetAllMessagesResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/getAllMessages [get]
-func (h *Handler) GetAllMessages(ctx *gin.Context) {
-	limit, _ := strconv.Atoi(ctx.Query("limit"))
-	offset, _ := strconv.Atoi(ctx.Query("offset"))
-	request := pb.GetAllMessagesRequest{
-		Limit:  int32(limit),
-		Offset: int32(offset),
+// GetMessages godoc
+// @Security ApiKeyAuth
+// @Summary get Message
+// @Description get Message
+// @Tags message
+// @Param limit query string false "Number of messages to fetch"
+// @Param offset query string false "Number of messages to omit"
+// @Success 200 {object} content.GetMessagesRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/messages [get]
+func (h *Handler) GetMessages(c *gin.Context) {
+	h.Log.Info("GetMessages started")
+	req := pb.GetMessagesReq{}
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Limit = int64(limit)
+	} else {
+		req.Limit = 10
 	}
 
-	resp, err := h.ContentService.GetAllMessages(ctx, &request)
+	if offsetStr != "" {
+		offset, err := strconv.Atoi(offsetStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Offset = int64(offset)
+	} else {
+		req.Offset = 0
+	}
+
+	res, err := h.ContentService.GetMessages(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway GetAllMessages"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
 
-	ctx.JSON(http.StatusOK, resp)
+	c.JSON(200, &res)
+	h.Log.Info("GetMessages ended")
 }
 
-// CreateTravelTipHandler handles creating a travel tip.
-// @Summary Create Travel Tip
-// @Description Create a new travel tip.
-// @Tags TravelTip
-// @Accept json
-// @Security BearerAuth
-// @Produce json
-// @Param Create body genproto.CreateTravelTipRequest true "Create Travel Tip"
-// @Success 200 {object} string
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/createTravelTip [post]
-func (h *Handler) CreateTravelTip(ctx *gin.Context) {
-	request := pb.CreateTravelTipRequest{}
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": err})
-		h.Log.Error("error")
-		return
-	}
-
-	if request.Title == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": "it is not full information"})
-		return
-	}
-
-	_, err := h.ContentService.CreateTravelTip(ctx, &request)
+// CreateTips godoc
+// @Security ApiKeyAuth
+// @Summary create
+// @Description create tips
+// @Tags tips
+// @Param info body content.CreateTipsReq true "destination_id"
+// @Success 200 {object} content.CreateTipsRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/travel-tips [post]
+func (h *Handler) CreateTips(c *gin.Context) {
+	h.Log.Info("CreateTips started")
+	accessToken := c.GetHeader("Authorization")
+	id, err := auth.GetUserIdFromAccessToken(accessToken)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error creating travel tip in handler"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Travel Tip Created",
-	})
+	req := pb.CreateTipsReq{}
+	err = c.BindJSON(&req)
+	if err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
+	}
+	req.UserId = id
+	res, err := h.ContentService.CreateTips(c, &req)
+	if err != nil {
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
+	}
+	c.JSON(200, &res)
+	h.Log.Info("CreateTips ended")
 }
 
-// GetTravelTipsHandler retrieves all travel tips with optional filtering and pagination.
-// @Summary Get All Travel Tips
-// @Description Retrieve all travel tips with optional filtering and pagination.
-// @Tags TravelTip
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param limit query int false "Number of items to return"
-// @Param offset query int false "Offset for pagination"
-// @Success 200 {object} genproto.GetTravelTipsResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/getTravelTips [get]
-func (h *Handler) GetTravelTips(ctx *gin.Context) {
-	limit, _ := strconv.Atoi(ctx.Query("limit"))
-	offset, _ := strconv.Atoi(ctx.Query("offset"))
-	request := pb.GetTravelTipsRequest{
-		Limit:  int32(limit),
-		Offset: int32(offset),
+// GetTips godoc
+// @Security ApiKeyAuth
+// @Summary get
+// @Description get tips
+// @Tags tips
+// @Param limit query string false "Number of messages to fetch"
+// @Param offset query string false "Number of messages to omit"
+// @Param category query string false "category"
+// @Success 200 {object} content.GetTipsRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/travel-tips [get]
+func (h *Handler) GetTips(c *gin.Context) {
+	h.Log.Info("GetTips started")
+
+	req := pb.GetTipsReq{}
+	req.Category = c.Query("category")
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Limit = int64(limit)
+	} else {
+		req.Limit = 10
 	}
 
-	resp, err := h.ContentService.GetTravelTips(ctx, &request)
+	if offsetStr != "" {
+		offset, err := strconv.Atoi(offsetStr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest,
+				gin.H{"error": err.Error()})
+			h.Log.Error(err.Error())
+			return
+		}
+		req.Offset = int64(offset)
+	} else {
+		req.Offset = 0
+	}
+
+	res, err := h.ContentService.GetTips(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway GetTravelTips"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusOK, resp)
+	c.JSON(200, &res)
+	h.Log.Info("GetTips ended")
 }
 
-// UserStatisticsHandler retrieves statistics about user activity.
-// @Summary Get User Statistics
-// @Description Retrieve statistics about user activity.
-// @Tags User
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param user_id path string true "User ID"
-// @Success 200 {object} genproto.UserStatisticsResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/userStatistics/{user_id} [get]
-func (h *Handler) UserStatistics(ctx *gin.Context) {
-	userID := ctx.Param("user_id")
-
-	_, err := uuid.Parse(userID)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, fmt.Errorf("wrong user_id"))
-		h.Log.Error("error")
-		return
+// GetUserStat godoc
+// @Security ApiKeyAuth
+// @Summary best
+// @Description get user
+// @Tags users
+// @Param user_id path string true "user_id"
+// @Success 200 {object} content.GetUserStatRes
+// @Failure 400 {object} string "Invalid data"
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/users/{user_id}/statistics [get]
+func (h *Handler) GetUserStat(c *gin.Context) {
+	h.Log.Info("GetUserStat started")
+	req := pb.GetUserStatReq{}
+	req.UserId = c.Param("user_id")
+	if len(req.UserId) <= 0 {
+		h.Log.Error("id is empty")
+		c.JSON(400, gin.H{"error": "id is empty"})
 	}
-
-	resp, err := h.ContentService.UserStatistics(ctx, &pb.UserStatisticsRequest{UserId: userID})
+	res, err := h.ContentService.GetUserStat(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway UserStatistics"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusOK, resp)
+	c.JSON(200, &res)
+	h.Log.Info("GetUserStat ended")
 }
 
-// GetTrendingDestinationsHandler retrieves trending destinations.
-// @Summary Get Trending Destinations
-// @Description Retrieve trending destinations.
-// @Tags Destination
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Success 200 {object} genproto.GetTrendingDestinationsResponse
-// @Failure 400 {object} string
-// @Failure 500 {object} string
-// @Router /content/get_trending_destinations [get]
-func (h *Handler) GetTrendingDestinations(ctx *gin.Context) {
-	resp, err := h.ContentService.GetTrendingDestinations(ctx, &pb.GetTrendingDestinationsRequest{})
+// TopDestinations godoc
+// @Security ApiKeyAuth
+// @Summary top places
+// @Description get top places
+// @Tags top
+// @Success 200 {object} content.Answer
+// @Failure 500 {object} string "Server error"
+// @Router /api/v1/trending-destinations [get]
+func (h *Handler) TopDestinations(c *gin.Context) {
+	h.Log.Info("TopDestinations started")
+	req := pb.Void{}
+	res, err := h.ContentService.TopDestinations(c, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "error in Gateway GetTrendingDestinations"})
-		h.Log.Error("error")
-		return
+		h.Log.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 	}
-
-	ctx.JSON(http.StatusOK, resp)
+	fmt.Println(res)
+	c.JSON(200, &res)
+	h.Log.Info("TopDestinations ended")
 }

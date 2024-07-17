@@ -1,26 +1,46 @@
-
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"API-Gateway/api"
+	"API-Gateway/api/handler"
+	"API-Gateway/genproto/content"
+	"API-Gateway/genproto/users"
+	"API-Gateway/logger"
+	"log"
+
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-func main() {
-	r := SetupRouter()
+var loge *zap.Logger
 
-	if err := r.Run(":8080"); err != nil {
+func initLog() {
+	log, err := logger.NewLogger()
+	if err != nil {
 		panic(err)
 	}
+	loge = log
 }
 
-func SetupRouter() *gin.Engine {
-	r := gin.Default()
+func main() {
+	initLog()
+	hand := NewHandler()
+	router := api.Router(hand)
+	log.Printf("server is running...")
+	log.Fatal(router.Run(":8080"))
+}
 
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "Hello, world!",
-		})
-	})
-
-	return r
+func NewHandler() *handler.Handler {
+	conn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		panic(err)
+	}
+	con, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		panic(err)
+	}
+	contenservice := content.NewContentClient(conn)
+	userservice := users.NewUserServiceClient(con)
+	return &handler.Handler{ContentService: contenservice, Log: loge, UserService: userservice}
 }
