@@ -1,75 +1,60 @@
-// package api
-
-// import (
-//     "github.com/gin-gonic/gin"
-//     "Auth-Service/handlers"
-//     "Auth-Service/middleware"
-// )
-
-// // SetupRouter configures the Gin router with routes and middleware
-// func SetupRouter() *gin.Engine {
-//     // Initialize Gin router
-//     r := gin.Default()
-
-//     // Apply middleware for JWT authentication
-//     r.Use(middleware.AuthMiddleware())
-
-//     // Routes that do not require authentication
-//     r.POST("/login", handlers.Login)
-//     r.POST("/verify-email", handlers.VerifyEmail)
-
-//     // Routes that require authentication
-//     auth := r.Group("/")
-//     {
-//         auth.POST("/register", handlers.Register)
-//         auth.POST("/profile", handlers.Profile)
-//         auth.POST("/update-profile", handlers.UpdateProfile)
-//         auth.POST("/get-users", handlers.GetUsers)
-//         auth.POST("/delete-user", handlers.DeleteUser)
-//         auth.POST("/reset-password", handlers.ResetPassword)
-//         auth.POST("/refresh-token", handlers.RefreshToken)
-//         auth.POST("/logout", handlers.Logout)
-//         auth.POST("/followers", handlers.GetFollowersByUserID)
-//     }
-
-//     return r
-// }
-
 package api
 
 import (
-	handlers "API-Gateway/api/handler"
-	a "API-Gateway/genproto"
+	_ "API-Gateway/api/docs"
+	"API-Gateway/api/handler"
+	"API-Gateway/api/middleware"
 
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// @title API Service
-// @version 1.0
-// @description API service
-// @host localhost:8080
-// @BasePath /
-// @securityDefinitions.apikey BearerAuth
+// @securityDefinitions.apikey ApiKeyAuth
 // @in header
 // @name Authorization
-func NewRouter(conn *grpc.ClientConn) *gin.Engine {
-	r := gin.Default()
-	contentService := a.NewContentServiceClient(conn)
+// @title User
+// @version 1.0
+// @description API Gateway
+// @host localhost:8080
+// BasePath: /
+func Router(hand *handler.Handler) *gin.Engine {
+	router := gin.Default()
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	st := handlers.Handler{ContentService: contentService}
-
-	auth := r.Group("/content")
+	stories := router.Group("/api/v1/stories")
+	stories.Use(middleware.AuthMiddleware)
 	{
-		auth.POST("/createStory", st.CreateStory)
-		auth.DELETE("/deleteStory", st.DeleteStory)
-		auth.PUT("/updateStory", st.UpdateStory)
-		auth.DELETE("/get_all", st.GetAllStories)
-		// auth.POST("/reset-password", st.ResetPassword)
-		// auth.POST("/refresh-token", st.RefreshToken)
-		// auth.POST("/logout", st.Logout)
-		// auth.GET("/followers", st.GetFollowersByUserID)
+		stories.POST("", hand.CreateStory)
+		stories.PUT("/:story_id", hand.UpdateStory)
+		stories.DELETE("/:story_id", hand.DeleteStory)
+		stories.GET("", hand.GetAllStories)
+		stories.GET("/:story_id", hand.GetStory)
+		stories.POST("/:story_id/comments", hand.CommentStory)
+		stories.GET("/:story_id/comments", hand.GetCommentsOfStory)
+		stories.POST("/:story_id/like", hand.Like)
+	}
+	itineraries := router.Group("/api/v1/itineraries")
+	itineraries.Use(middleware.AuthMiddleware)
+	{
+		itineraries.POST("", hand.Itineraries)
+		itineraries.PUT("/:itinerary_id", hand.UpdateItineraries)
+		itineraries.DELETE("/:itinerary_id", hand.DeleteItineraries)
+		itineraries.GET("", hand.GetItineraries)
+		itineraries.GET("/:itinerary_id", hand.GetItinerariesById)
+		itineraries.POST("/:itinerary_id/comments", hand.CommentItineraries)
+
 	}
 
-	return r
+	router.Use(middleware.AuthMiddleware)
+	router.GET("/api/v1/destinations", hand.GetDestinations)
+	router.GET("/api/v1/destinations/:destination_id", hand.GetDestinationsById)
+	router.POST("/api/v1/messages", hand.SendMessage)
+	router.GET("/api/v1/messages", hand.GetMessages)
+	router.POST("/api/v1/travel-tips", hand.CreateTips)
+	router.GET("/api/v1/travel-tips", hand.GetTips)
+	router.GET("/api/v1/users/:user_id/statistics", hand.GetUserStat)
+	router.GET("/api/v1/trending-destinations", hand.TopDestinations)
+
+	return router
 }

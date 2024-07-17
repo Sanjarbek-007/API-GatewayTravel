@@ -1,22 +1,23 @@
-package handlers
+package handler
 
 import (
-	"API-Gateway/genproto"
-	"go.uber.org/zap"
+	"API-Gateway/genproto/content"
+	"API-Gateway/genproto/users"
 
+	"go.uber.org/zap"
 )
 
 type Handler struct {
-	ContentService     genproto.ContentServiceClient
-	// UsersService       genproto.UserServiceClient
+	ContentService     content.ContentClient
 	Log                *zap.Logger
+	UserService        users.UserServiceClient
 }
 
-func NewHandler(content genproto.ContentServiceClient, user genproto.UserServiceClient, l *zap.Logger) *Handler {
+func NewHandler(content content.ContentClient, l *zap.Logger, user users.UserServiceClient) *Handler {
 	return &Handler{
 		ContentService:     content,
-		// UsersService:       user,
 		Log: l,
+		UserService: user,
 		
 	}
 }
