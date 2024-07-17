@@ -1,0 +1,14 @@
+{"level":"info","time":"2024-07-17T17:17:26.073+0500","msg":"Itineraries started"}
+{"level":"error","time":"2024-07-17T17:17:26.223+0500","msg":"there"}
+{"level":"error","time":"2024-07-17T17:17:26.223+0500","msg":"rpc error: code = Unknown desc = pq: date/time field value out of range: \"2024-20-12\""}
+{"level":"info","time":"2024-07-17T17:17:26.223+0500","msg":"Itineraries ended"}
+{"level":"info","time":"2024-07-17T17:18:08.480+0500","msg":"Itineraries started"}
+{"level":"info","time":"2024-07-17T17:18:08.497+0500","msg":"Itineraries ended"}
+{"level":"info","time":"2024-07-17T17:18:20.999+0500","msg":"GetItineraries started"}
+{"level":"info","time":"2024-07-17T17:18:21.004+0500","msg":"GetItineraries ended"}
+{"level":"info","time":"2024-07-17T19:25:36.780+0500","msg":"TopDestinations started"}
+{"level":"info","time":"2024-07-17T19:25:36.806+0500","msg":"TopDestinations ended"}
+{"level":"info","time":"2024-07-17T19:26:01.805+0500","msg":"GetUserStat started"}
+{"level":"info","time":"2024-07-17T19:26:01.814+0500","msg":"GetUserStat ended"}
+{"level":"info","time":"2024-07-17T19:26:21.965+0500","msg":"GetTips started"}
+{"level":"info","time":"2024-07-17T19:26:21.971+0500","msg":"GetTips ended"}
